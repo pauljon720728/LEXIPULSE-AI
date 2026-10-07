@@ -13,6 +13,13 @@ import json
 import datetime
 from dotenv import load_dotenv
 
+# Ensure safe UTF-8 terminal printing on Windows
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 # Ensure root .env is loaded
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 load_dotenv(os.path.join(ROOT_DIR, ".env"))
@@ -65,7 +72,7 @@ def main():
             supabase.table("departments").upsert(dept, on_conflict="id").execute()
         except Exception as e:
             print(f"    [-] Department '{dept['name']}' note: {e}")
-    print(f"    [✓] {len(departments)} departments verified in Supabase.")
+    print(f"    [OK] {len(departments)} departments verified in Supabase.")
 
     # -------------------------------------------------------------------------
     # 2. PROVISION AUTH USERS ACROSS CITIZEN, OFFICER, AND ADMIN ROLES
@@ -267,7 +274,7 @@ def main():
     print("\n[4/4] Verifying Cloud Persistence via Fresh Supabase SELECT Queries...")
 
     # Query Users
-    res_users = supabase.table("users").select("role, count", count="exact").execute()
+    res_users = supabase.table("users").select("id, role", count="exact").execute()
     total_users_count = res_users.count if res_users.count is not None else len(res_users.data or [])
 
     # Role Breakdown
@@ -302,7 +309,7 @@ def main():
         print(f"    English   : {c.get('translated_text')[:75]}...")
         print("-" * 80)
 
-    print("\n[✓] All data successfully written to and verified from Supabase!")
+    print("\n[OK] All data successfully written to and verified from Supabase!")
     print("=" * 80)
     return 0
 
