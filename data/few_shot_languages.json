@@ -1,0 +1,72 @@
+{
+  "curated_languages": [
+    { "code": "en", "name": "English", "native": "English", "tier": "Dedicated MT", "coverage": "HIGH" },
+    { "code": "hi", "name": "Hindi", "native": "हिन्दी", "tier": "IndicTrans2 / Dedicated MT", "coverage": "HIGH" },
+    { "code": "te", "name": "Telugu", "native": "తెలుగు", "tier": "IndicTrans2 / Dedicated MT", "coverage": "HIGH" },
+    { "code": "ta", "name": "Tamil", "native": "தமிழ்", "tier": "IndicTrans2 / Dedicated MT", "coverage": "HIGH" },
+    { "code": "bn", "name": "Bengali", "native": "বাংলা", "tier": "IndicTrans2 / Dedicated MT", "coverage": "HIGH" },
+    { "code": "ur", "name": "Urdu", "native": "اردو", "tier": "IndicTrans2 / Dedicated MT", "coverage": "HIGH" },
+    { "code": "mr", "name": "Marathi", "native": "मराठी", "tier": "IndicTrans2 / NLLB-200", "coverage": "HIGH" },
+    { "code": "gu", "name": "Gujarati", "native": "ગુજરાતી", "tier": "IndicTrans2 / NLLB-200", "coverage": "HIGH" },
+    { "code": "pa", "name": "Punjabi", "native": "ਪੰਜਾਬੀ", "tier": "IndicTrans2 / NLLB-200", "coverage": "HIGH" },
+    { "code": "ml", "name": "Malayalam", "native": "മലയാളം", "tier": "IndicTrans2 / NLLB-200", "coverage": "HIGH" },
+    { "code": "kn", "name": "Kannada", "native": "ಕನ್ನಡ", "tier": "IndicTrans2 / NLLB-200", "coverage": "HIGH" },
+    { "code": "or", "name": "Odia", "native": "ଓଡ଼ିଆ", "tier": "IndicTrans2 / NLLB-200", "coverage": "HIGH" },
+    { "code": "as", "name": "Assamese", "native": "অসমীয়া", "tier": "IndicTrans2 / NLLB-200", "coverage": "HIGH" },
+    { "code": "fr", "name": "French", "native": "Français", "tier": "MarianMT / NLLB-200", "coverage": "HIGH" },
+    { "code": "de", "name": "German", "native": "Deutsch", "tier": "MarianMT / NLLB-200", "coverage": "HIGH" },
+    { "code": "es", "name": "Spanish", "native": "Español", "tier": "MarianMT / NLLB-200", "coverage": "HIGH" },
+    { "code": "ar", "name": "Arabic", "native": "العربية", "tier": "MarianMT / NLLB-200", "coverage": "HIGH" },
+    { "code": "ru", "name": "Russian", "native": "Русский", "tier": "MarianMT / NLLB-200", "coverage": "HIGH" }
+  ],
+  "few_shot_examples": [
+    {
+      "language": "Telugu",
+      "complaint": "నా భర్త నన్ను రోజూ కొడుతున్నాడు, నాకు చాలా భయంగా ఉంది, దయచేసి వెంటనే సహాయం చేయండి",
+      "output": {
+        "detected_language": "Telugu",
+        "translated_text": "My husband beats me every day, I am very afraid, please help me immediately",
+        "translation_confidence": "high",
+        "emotion": "Fear",
+        "emotion_confidence": 95,
+        "urgency": "Critical",
+        "urgency_confidence": 97,
+        "category": "Domestic Issue",
+        "category_confidence": 93,
+        "reasoning": "The complaint mentions repeated physical violence ('beats me every day') and an explicit urgent plea ('please help immediately'), both strongly indicating fear and critical urgency requiring immediate intervention."
+      }
+    },
+    {
+      "language": "French",
+      "complaint": "On m'a facturé deux fois pour le même achat en ligne et le service client ne répond pas.",
+      "output": {
+        "detected_language": "French",
+        "translated_text": "I was charged twice for the same online purchase and customer service is not responding.",
+        "translation_confidence": "medium",
+        "emotion": "Frustration",
+        "emotion_confidence": 78,
+        "urgency": "Medium",
+        "urgency_confidence": 65,
+        "category": "Consumer Complaint",
+        "category_confidence": 90,
+        "reasoning": "The complaint describes a billing error and lack of response from support, indicating frustration but no immediate threat to safety, hence medium urgency."
+      }
+    },
+    {
+      "language": "Malayalam",
+      "complaint": "എന്റെ ഭൂമി അയൽവാസി അനധികൃതമായി കൈയേറി വേലി കെട്ടി, ചോദിച്ചപ്പോൾ വധഭീഷണി മുഴക്കി.",
+      "output": {
+        "detected_language": "Malayalam",
+        "translated_text": "My neighbor unlawfully encroached upon my land and put up a fence, and when questioned, issued death threats.",
+        "translation_confidence": "high",
+        "emotion": "Fear",
+        "emotion_confidence": 91,
+        "urgency": "Critical",
+        "urgency_confidence": 92,
+        "category": "Property Dispute",
+        "category_confidence": 95,
+        "reasoning": "The complaint reports illegal property encroachment compounded by active death threats ('issued death threats'), representing imminent safety peril and critical urgency."
+      }
+    }
+  ]
+}
