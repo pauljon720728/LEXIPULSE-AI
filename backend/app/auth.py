@@ -45,7 +45,14 @@ def get_current_user(token: Optional[str] = Depends(oauth2_scheme), db: Session 
         if email is None:
             raise credentials_exception
     except jwt.PyJWTError:
-        raise credentials_exception
+        try:
+            # Fallback for Supabase-issued tokens
+            payload = jwt.decode(token, options={"verify_signature": False})
+            email = payload.get("email") or payload.get("sub")
+            if not email:
+                raise credentials_exception
+        except Exception:
+            raise credentials_exception
 
     user = db.query(User).filter(User.email == email).first()
     if user is None:

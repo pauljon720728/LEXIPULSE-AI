@@ -8,26 +8,106 @@ logger = logging.getLogger(__name__)
 class SupabaseService:
     def __init__(self):
         self.client = None
+        self.anon_client = None
         self._init_client()
 
     def _init_client(self):
         url = settings.SUPABASE_URL
         key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_ANON_KEY
+        anon_key = settings.SUPABASE_ANON_KEY
 
         if url and key and url.startswith("https://") and "your-project" not in url:
             try:
                 from supabase import create_client
                 self.client = create_client(url, key)
+                if anon_key:
+                    self.anon_client = create_client(url, anon_key)
+                else:
+                    self.anon_client = self.client
                 logger.info("Supabase client initialized successfully on backend.")
             except Exception as e:
                 logger.warning(f"Could not initialize Supabase client: {e}")
                 self.client = None
+                self.anon_client = None
         else:
             self.client = None
+            self.anon_client = None
 
     @property
     def is_configured(self) -> bool:
         return self.client is not None
+
+    def verify_user_credentials(self, email: str, password: str) -> Optional[Dict[str, Any]]:
+        """Verify user login against Supabase Auth directly."""
+        client_to_use = self.anon_client or self.client
+        if not client_to_use:
+            return None
+        try:
+            res = client_to_use.auth.sign_in_with_password({"email": email, "password": password})
+            if res and res.user:
+                return {
+                    "id": res.user.id,
+                    "email": res.user.email,
+                    "user_metadata": res.user.user_metadata or {}
+                }
+        except Exception:
+            return None
+        return None
+
+    def provision_auth_user(self, email: str, password: str, full_name: str, role: str = "citizen", language_pref: str = "en", phone: str = "") -> Optional[str]:
+        """Provision user in Supabase Auth with auto email-confirmation and matching public.users row."""
+        if not self.client:
+            return None
+        user_uid = None
+        try:
+            auth_res = self.client.auth.admin.create_user({
+                "email": email,
+                "password": password,
+                "email_confirm": True,
+                "user_metadata": {
+                    "full_name": full_name,
+                    "role": role,
+                    "language_pref": language_pref,
+                    "phone": phone
+                }
+            })
+            if auth_res and hasattr(auth_res, "user") and auth_res.user:
+                user_uid = auth_res.user.id
+        except Exception as e:
+            # User might already exist; update their password and confirm email
+            try:
+                for u in self.client.auth.admin.list_users():
+                    if u.email == email:
+                        self.client.auth.admin.update_user_by_id(u.id, {
+                            "password": password,
+                            "email_confirm": True,
+                            "user_metadata": {
+                                "full_name": full_name,
+                                "role": role,
+                                "language_pref": language_pref,
+                                "phone": phone
+                            }
+                        })
+                        user_uid = u.id
+                        break
+            except Exception:
+                pass
+
+        if user_uid:
+            try:
+                self.client.table("users").upsert({
+                    "id": str(user_uid),
+                    "name": full_name,
+                    "email": email,
+                    "role": role,
+                    "language_pref": language_pref,
+                    "phone": phone,
+                    "is_active": True
+                }, on_conflict="id").execute()
+            except Exception as e:
+                logger.warning(f"Could not upsert into public.users: {e}")
+
+        return str(user_uid) if user_uid else None
 
     def insert_complaint(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if not self.client:

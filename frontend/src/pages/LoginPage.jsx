@@ -55,29 +55,25 @@ export default function LoginPage({ onLoginSuccess, onNavigateToRegister, curren
     try {
       let loggedInUser = null;
 
-      // 1. Try Supabase Auth direct login first if configured
+      // 1. Authenticate via backend API (cross-checks SQLite and Supabase Auth with auto-sync)
+      const data = await apiRequest('/auth/login', 'POST', {
+        email: email.trim(),
+        password,
+      });
+
+      localStorage.setItem('legal_jwt_token', data.access_token);
+      loggedInUser = data.user;
+
+      // 2. Also establish direct Supabase client session if Supabase is configured
       if (isSupabaseConfigured) {
         try {
           const supaRes = await loginUser({ email: email.trim(), password });
-          loggedInUser = supaRes.user;
-          if (supaRes.session?.access_token) {
-            localStorage.setItem('legal_jwt_token', supaRes.session.access_token);
+          if (supaRes?.user) {
+            loggedInUser = { ...loggedInUser, ...supaRes.user };
           }
         } catch (supaErr) {
-          // If Supabase failed or user not yet in Supabase Auth, attempt backend API
-          console.warn("Supabase Auth sign-in failed, attempting backend auth:", supaErr.message);
+          console.warn("Supabase Auth session sync note:", supaErr.message);
         }
-      }
-
-      // 2. If not logged in via Supabase directly, authenticate via backend API
-      if (!loggedInUser) {
-        const data = await apiRequest('/auth/login', 'POST', {
-          email: email.trim(),
-          password,
-        });
-
-        localStorage.setItem('legal_jwt_token', data.access_token);
-        loggedInUser = data.user;
       }
 
       // Store authenticated session

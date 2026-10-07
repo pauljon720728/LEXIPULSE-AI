@@ -67,19 +67,7 @@ export default function RegisterPage({ onNavigateToLogin, currentLang, setCurren
     setLoading(true);
 
     try {
-      // 1. Try Supabase Auth direct registration if configured
-      if (isSupabaseConfigured) {
-        await registerUser({
-          email: email.trim(),
-          password,
-          fullName: fullName.trim(),
-          role: 'citizen',
-          languagePref,
-          phone: phone.trim()
-        });
-      }
-
-      // 2. Also register in backend DB to ensure unified cross-system consistency
+      // 1. Register through backend to ensure unified consistency and auto-confirmed Supabase account
       await apiRequest('/auth/register', 'POST', {
         email: email.trim(),
         full_name: fullName.trim(),
@@ -87,10 +75,24 @@ export default function RegisterPage({ onNavigateToLogin, currentLang, setCurren
         role: 'citizen',
         language_pref: languagePref,
         phone: phone.trim() || undefined
-      }).catch(err => {
-        // If supabase already handled it and backend reported duplicate, ignore if success
-        if (!isSupabaseConfigured) throw err;
       });
+
+      // 2. Also ensure Supabase client session/profile alignment if configured
+      if (isSupabaseConfigured) {
+        try {
+          await registerUser({
+            email: email.trim(),
+            password,
+            fullName: fullName.trim(),
+            role: 'citizen',
+            languagePref,
+            phone: phone.trim()
+          });
+        } catch (supaErr) {
+          // If backend already provisioned the user, duplicate message is expected and safe
+          console.log("Supabase direct registration alignment:", supaErr.message);
+        }
+      }
 
       setSuccessMsg("Account successfully registered! Redirecting to login...");
       setTimeout(() => {
