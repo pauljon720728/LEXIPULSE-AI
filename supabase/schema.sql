@@ -159,11 +159,13 @@ $$ LANGUAGE sql STABLE SECURITY DEFINER;
 -- DEPARTMENTS POLICIES:
 -- Everyone can read departments; only Admins can create/edit them
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Departments are viewable by all authenticated users" ON public.departments;
 CREATE POLICY "Departments are viewable by all authenticated users"
     ON public.departments FOR SELECT
     TO authenticated, anon
     USING (true);
 
+DROP POLICY IF EXISTS "Departments manageable by admins only" ON public.departments;
 CREATE POLICY "Departments manageable by admins only"
     ON public.departments FOR ALL
     TO authenticated
@@ -173,16 +175,19 @@ CREATE POLICY "Departments manageable by admins only"
 -- USERS POLICIES:
 -- Users can view their own profile; Admins can view/edit all users
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Users can view own profile" ON public.users;
 CREATE POLICY "Users can view own profile"
     ON public.users FOR SELECT
     TO authenticated
     USING (id = auth.uid() OR public.current_user_role() IN ('admin', 'super_admin', 'officer'));
 
+DROP POLICY IF EXISTS "Users can update own profile" ON public.users;
 CREATE POLICY "Users can update own profile"
     ON public.users FOR UPDATE
     TO authenticated
     USING (id = auth.uid() OR public.current_user_role() IN ('admin', 'super_admin'));
 
+DROP POLICY IF EXISTS "Admins full management on users" ON public.users;
 CREATE POLICY "Admins full management on users"
     ON public.users FOR ALL
     TO authenticated
@@ -194,11 +199,13 @@ CREATE POLICY "Admins full management on users"
 -- 2. Officers can read complaints assigned to their department
 -- 3. Admins have full read/write access
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Citizens can insert own complaints" ON public.complaints;
 CREATE POLICY "Citizens can insert own complaints"
     ON public.complaints FOR INSERT
     TO authenticated
     WITH CHECK (auth.uid() = citizen_id OR citizen_id IS NULL);
 
+DROP POLICY IF EXISTS "Citizens can view own complaints" ON public.complaints;
 CREATE POLICY "Citizens can view own complaints"
     ON public.complaints FOR SELECT
     TO authenticated
@@ -211,6 +218,7 @@ CREATE POLICY "Citizens can view own complaints"
         )
     );
 
+DROP POLICY IF EXISTS "Officers can update department complaints" ON public.complaints;
 CREATE POLICY "Officers can update department complaints"
     ON public.complaints FOR UPDATE
     TO authenticated
@@ -222,6 +230,7 @@ CREATE POLICY "Officers can update department complaints"
         )
     );
 
+DROP POLICY IF EXISTS "Admins full control on complaints" ON public.complaints;
 CREATE POLICY "Admins full control on complaints"
     ON public.complaints FOR ALL
     TO authenticated
@@ -230,6 +239,7 @@ CREATE POLICY "Admins full control on complaints"
 -- ------------------------------------------------------------------------------
 -- AUDIT LOG POLICIES:
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Audit logs viewable by officers and admins, and citizens for their complaints" ON public.audit_log;
 CREATE POLICY "Audit logs viewable by officers and admins, and citizens for their complaints"
     ON public.audit_log FOR SELECT
     TO authenticated
@@ -242,6 +252,7 @@ CREATE POLICY "Audit logs viewable by officers and admins, and citizens for thei
         )
     );
 
+DROP POLICY IF EXISTS "Audit logs insertable by authenticated users and system" ON public.audit_log;
 CREATE POLICY "Audit logs insertable by authenticated users and system"
     ON public.audit_log FOR INSERT
     TO authenticated
@@ -250,11 +261,13 @@ CREATE POLICY "Audit logs insertable by authenticated users and system"
 -- ------------------------------------------------------------------------------
 -- MODEL PREDICTIONS POLICIES:
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Predictions viewable by officers and admins" ON public.model_predictions;
 CREATE POLICY "Predictions viewable by officers and admins"
     ON public.model_predictions FOR SELECT
     TO authenticated
     USING (public.current_user_role() IN ('officer', 'admin', 'super_admin'));
 
+DROP POLICY IF EXISTS "Predictions insertable by system" ON public.model_predictions;
 CREATE POLICY "Predictions insertable by system"
     ON public.model_predictions FOR INSERT
     TO authenticated
