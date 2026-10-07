@@ -35,6 +35,8 @@ export default function OfficerDashboard({ user, onCriticalEscalation }) {
   const [emotionFilter, setEmotionFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const [departmentFilter, setDepartmentFilter] = useState(isAdmin ? '' : (user?.department_id ? String(user.department_id) : ''));
   const [page, setPage] = useState(1);
 
   // Selected complaint for Detail Inspector Modal
@@ -61,7 +63,7 @@ export default function OfficerDashboard({ user, onCriticalEscalation }) {
         emotion: emotionFilter,
         category: categoryFilter,
         status: statusFilter,
-        departmentId: user?.department_id,
+        departmentId: departmentFilter ? parseInt(departmentFilter) : null,
         page,
         pageSize: 25
       });
@@ -83,7 +85,7 @@ export default function OfficerDashboard({ user, onCriticalEscalation }) {
 
   useEffect(() => {
     loadComplaints();
-  }, [page, urgencyFilter, emotionFilter, categoryFilter, statusFilter]);
+  }, [page, urgencyFilter, emotionFilter, categoryFilter, statusFilter, departmentFilter]);
 
   // Realtime Supabase Subscription via complaintService
   useEffect(() => {
@@ -238,8 +240,24 @@ export default function OfficerDashboard({ user, onCriticalEscalation }) {
         </div>
 
         {/* Filter Dropdowns */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-100 dark:border-slate-700/60 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-slate-100 dark:border-slate-700/60 text-xs">
           
+          <select
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value)}
+            className="bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-200 rounded-xl px-3 py-1.5 border border-slate-200 dark:border-slate-700 focus:outline-none"
+          >
+            <option value="">All Departments</option>
+            <option value="1">Cyber Crime Cell</option>
+            <option value="2">Women & Child Safety</option>
+            <option value="3">Economic Offences Wing</option>
+            <option value="4">Revenue & Civil Grievance</option>
+            <option value="5">Internal Complaints / POSH</option>
+            <option value="6">Consumer Redressal</option>
+            <option value="7">Labor Grievance Tribunal</option>
+            <option value="8">Anti-Corruption / Vigilance</option>
+          </select>
+
           <select
             value={urgencyFilter}
             onChange={(e) => setUrgencyFilter(e.target.value)}
