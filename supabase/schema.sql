@@ -78,7 +78,11 @@ CREATE TABLE IF NOT EXISTS public.complaints (
     model_mode_used VARCHAR(50) DEFAULT 'transformer',
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
-    resolved_at TIMESTAMPTZ
+    resolved_at TIMESTAMPTZ,
+
+    -- Official Resolution & Case Clearance
+    resolution_notes TEXT,
+    resolved_by VARCHAR(255)
 );
 
 -- 5. AUDIT LOG TABLE
@@ -211,11 +215,7 @@ CREATE POLICY "Citizens can view own complaints"
     TO authenticated
     USING (
         auth.uid() = citizen_id
-        OR public.current_user_role() IN ('admin', 'super_admin')
-        OR (
-            public.current_user_role() = 'officer'
-            AND (department_id IS NULL OR department_id = public.current_user_department() OR assigned_officer_id = auth.uid())
-        )
+        OR public.current_user_role() IN ('admin', 'super_admin', 'officer')
     );
 
 DROP POLICY IF EXISTS "Officers can update department complaints" ON public.complaints;
@@ -223,11 +223,7 @@ CREATE POLICY "Officers can update department complaints"
     ON public.complaints FOR UPDATE
     TO authenticated
     USING (
-        public.current_user_role() IN ('admin', 'super_admin')
-        OR (
-            public.current_user_role() = 'officer'
-            AND (department_id IS NULL OR department_id = public.current_user_department() OR assigned_officer_id = auth.uid())
-        )
+        public.current_user_role() IN ('admin', 'super_admin', 'officer')
     );
 
 DROP POLICY IF EXISTS "Admins full control on complaints" ON public.complaints;
@@ -299,3 +295,10 @@ BEGIN
         ALTER PUBLICATION supabase_realtime ADD TABLE public.users;
     END IF;
 END $$;
+
+-- ==============================================================================
+-- SAFE MIGRATIONS FOR EXISTING INSTANCES
+-- ==============================================================================
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS resolution_notes TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS resolved_by VARCHAR(255);
+

@@ -23,6 +23,7 @@ def get_system_model_mode(db: Session) -> str:
     return setting.value if setting else "transformer"
 
 from app.services.complaint_service import complaint_service
+from app.services.supabase_service import supabase_service
 
 @router.post("/submit")
 async def submit_complaint(
@@ -119,7 +120,10 @@ def list_complaints(
             "explanation_text": c.explanation_text,
             "trigger_keywords": c.trigger_keywords,
             "model_mode_used": c.model_mode_used,
-            "created_at": c.created_at.isoformat() if c.created_at else None
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+            "resolved_at": c.resolved_at.isoformat() if c.resolved_at else None,
+            "resolution_notes": getattr(c, 'resolution_notes', None),
+            "resolved_by": getattr(c, 'resolved_by', None)
         })
 
     return {
@@ -176,6 +180,8 @@ def get_complaint_detail(complaint_id: str, db: Session = Depends(get_db)):
             "created_at": c.created_at.isoformat() if c.created_at else None,
             "updated_at": c.updated_at.isoformat() if c.updated_at else None,
             "resolved_at": c.resolved_at.isoformat() if c.resolved_at else None,
+            "resolution_notes": getattr(c, 'resolution_notes', None),
+            "resolved_by": getattr(c, 'resolved_by', None)
         },
         "similar_past_complaints": similar,
         "audit_logs": [
@@ -205,23 +211,59 @@ def update_complaint_status(
     c.status = update_data.status
     if update_data.assigned_officer_id:
         c.assigned_officer_id = update_data.assigned_officer_id
+
+    user_name = current_user.full_name if current_user else "Authorized Duty Officer"
+    user_id = current_user.id if current_user else None
+
     if update_data.status == "Resolved":
         c.resolved_at = datetime.datetime.utcnow()
+        c.resolution_notes = update_data.resolution_notes or update_data.notes or "Official grievance verification completed. Resolution granted."
+        c.resolved_by = update_data.resolved_by or user_name
 
-    # Log action
-    user_name = current_user.full_name if current_user else "Authorized Officer"
-    user_id = current_user.id if current_user else None
+    # Log action in SQLite
     audit = AuditLog(
         complaint_id=complaint_id,
         user_id=user_id,
         user_name=user_name,
         action=f"Status Changed: {old_status} -> {update_data.status}",
-        details=update_data.notes or f"Complaint transitioned to {update_data.status} state."
+        details=c.resolution_notes or update_data.notes or f"Complaint transitioned to {update_data.status} state."
     )
     db.add(audit)
     db.commit()
     db.refresh(c)
-    return {"message": "Status updated successfully", "complaint_id": c.id, "status": c.status}
+
+    # Mirror status update & resolution to Supabase
+    if supabase_service.is_configured:
+        try:
+            supa_update = {
+                "status": update_data.status,
+                "updated_at": datetime.datetime.utcnow().isoformat()
+            }
+            if update_data.status == "Resolved":
+                supa_update["resolved_at"] = datetime.datetime.utcnow().isoformat()
+            supabase_service.client.table("complaints").update(supa_update).eq("id", complaint_id).execute()
+        except Exception:
+            pass
+
+        try:
+            supabase_service.insert_audit_log(
+                complaint_id=complaint_id,
+                action=f"Status: {update_data.status}",
+                details=f"Officer {user_name} transitioned case to {update_data.status}. Resolution: {c.resolution_notes or update_data.notes}",
+                user_id=str(user_id) if user_id else None,
+                user_name=user_name
+            )
+        except Exception:
+            pass
+
+    return {
+        "message": "Status updated successfully",
+        "complaint_id": c.id,
+        "status": c.status,
+        "resolution_notes": c.resolution_notes,
+        "resolved_by": c.resolved_by,
+        "resolved_at": c.resolved_at.isoformat() if c.resolved_at else None
+    }
 
 @router.get("/{complaint_id}/pdf")
 def download_pdf(complaint_id: str, db: Session = Depends(get_db)):
@@ -249,7 +291,10 @@ def download_pdf(complaint_id: str, db: Session = Depends(get_db)):
         "explanation_text": c.explanation_text,
         "trigger_keywords": c.trigger_keywords,
         "model_mode_used": c.model_mode_used,
-        "created_at": c.created_at
+        "created_at": c.created_at,
+        "resolved_at": c.resolved_at,
+        "resolution_notes": c.resolution_notes,
+        "resolved_by": c.resolved_by
     }
 
     pdf_bytes = generate_complaint_pdf(complaint_dict)

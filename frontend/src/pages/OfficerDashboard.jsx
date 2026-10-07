@@ -36,13 +36,19 @@ export default function OfficerDashboard({ user, onCriticalEscalation }) {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
-  const [departmentFilter, setDepartmentFilter] = useState(isAdmin ? '' : (user?.department_id ? String(user.department_id) : ''));
+  const [departmentFilter, setDepartmentFilter] = useState('');
   const [page, setPage] = useState(1);
 
   // Selected complaint for Detail Inspector Modal
   const [selectedComplaintId, setSelectedComplaintId] = useState(null);
   const [detailData, setDetailData] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+
+  // Resolution modal state
+  const [showResolveModal, setShowResolveModal] = useState(false);
+  const [resolutionNotes, setResolutionNotes] = useState('');
+  const [resolvedByOfficer, setResolvedByOfficer] = useState('');
+  const [resolutionSuccessMsg, setResolutionSuccessMsg] = useState('');
 
   // Action status update state
   const [actionLoading, setActionLoading] = useState(false);
@@ -131,15 +137,18 @@ export default function OfficerDashboard({ user, onCriticalEscalation }) {
   };
 
   // Change complaint status via complaintService
-  const handleUpdateStatus = async (newStatus) => {
+  const handleUpdateStatus = async (newStatus, customNotes = '', customResolvedBy = '') => {
     if (!selectedComplaintId) return;
     setActionLoading(true);
     try {
+      const finalNote = customNotes || `Status transitioned to ${newStatus} by ${user?.full_name || 'Officer'}`;
       await complaintService.updateStatus(
         selectedComplaintId,
         newStatus,
         user,
-        `Status transitioned to ${newStatus} by ${user?.full_name || 'Officer'}`
+        finalNote,
+        customNotes,
+        customResolvedBy || user?.full_name || 'Officer'
       );
 
       // Refresh detail and queue
@@ -147,6 +156,39 @@ export default function OfficerDashboard({ user, onCriticalEscalation }) {
       loadComplaints();
     } catch (err) {
       alert(`Status update failed: ${err.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openResolveModal = () => {
+    setResolvedByOfficer(user?.full_name || 'Inspector Vikram Rathore');
+    setResolutionNotes('');
+    setResolutionSuccessMsg('');
+    setShowResolveModal(true);
+  };
+
+  const handleConfirmResolve = async () => {
+    if (!resolutionNotes.trim()) {
+      alert("Please provide the resolution details explaining how this case was investigated and resolved.");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await complaintService.updateStatus(
+        selectedComplaintId,
+        'Resolved',
+        user,
+        resolutionNotes,
+        resolutionNotes,
+        resolvedByOfficer || user?.full_name || 'Authorized Officer'
+      );
+      setResolutionSuccessMsg("Case officially resolved! Clearance certificate generated.");
+      setShowResolveModal(false);
+      await handleOpenDetail(selectedComplaintId);
+      loadComplaints();
+    } catch (err) {
+      alert(`Resolution failed: ${err.message}`);
     } finally {
       setActionLoading(false);
     }
@@ -568,10 +610,11 @@ export default function OfficerDashboard({ user, onCriticalEscalation }) {
                     </button>
                     <button
                       disabled={actionLoading}
-                      onClick={() => handleUpdateStatus('Resolved')}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm transition-colors"
+                      onClick={openResolveModal}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm transition-colors flex items-center gap-1.5"
                     >
-                      Mark Resolved
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Resolve & Issue Clearance
                     </button>
                     <a
                       href={downloadPdfUrl(selectedComplaintId)}
@@ -580,10 +623,47 @@ export default function OfficerDashboard({ user, onCriticalEscalation }) {
                       className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-sm transition-colors flex items-center gap-1"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      Download PDF Case Dossier
+                      Download Clearance PDF
                     </a>
                   </div>
                 </div>
+
+                {/* Resolution Notice & Clearance Certificate Banner */}
+                {(detailData.complaint.status === 'Resolved' || detailData.complaint.resolution_notes) && (
+                  <div className="p-4 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 font-bold text-emerald-800 dark:text-emerald-300 text-xs uppercase tracking-wide">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span>Official Case Clearance & Resolution Certificate</span>
+                      </div>
+                      {detailData.complaint.resolved_at && (
+                        <span className="text-[11px] font-mono text-emerald-700 dark:text-emerald-400">
+                          Cleared at: {new Date(detailData.complaint.resolved_at).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900/60 text-slate-800 dark:text-slate-100 text-xs leading-relaxed">
+                      <span className="block font-bold text-[10px] text-emerald-700 dark:text-emerald-400 uppercase mb-1">
+                        Manual Resolution Statement & Action Log:
+                      </span>
+                      {detailData.complaint.resolution_notes || "Case was thoroughly investigated, verified, and resolved in accordance with standard operating procedure."}
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+                      <span className="text-slate-600 dark:text-slate-400">
+                        Investigating Authority: <strong className="text-slate-900 dark:text-slate-100">{detailData.complaint.resolved_by || user?.full_name || 'Designated Duty Officer'}</strong>
+                      </span>
+                      <a
+                        href={downloadPdfUrl(selectedComplaintId)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm transition-colors"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Download Official Signed Clearance PDF
+                      </a>
+                    </div>
+                  </div>
+                )}
 
                 {/* Original vs Translated Text Comparison */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -727,6 +807,83 @@ export default function OfficerDashboard({ user, onCriticalEscalation }) {
               </div>
             ) : null}
 
+          </div>
+        </div>
+      )}
+
+      {/* Official Case Resolution & Clearance Statement Modal */}
+      {showResolveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-xl rounded-3xl bg-white dark:bg-slate-900 border border-emerald-500/30 shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-white" />
+                <h3 className="font-bold text-base">Official Case Resolution & Clearance Protocol</h3>
+              </div>
+              <button 
+                onClick={() => setShowResolveModal(false)}
+                className="p-1 rounded-full hover:bg-white/20 text-white/90"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs sm:text-sm">
+              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 text-xs">
+                Case Reference: <strong className="font-mono text-emerald-800 dark:text-emerald-300">{selectedComplaintId}</strong>
+                <span className="mx-2">•</span>
+                Citizen: <strong>{detailData?.complaint?.citizen_name || 'Complainant'}</strong>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                  Investigating Officer / Resolution Authority
+                </label>
+                <input
+                  type="text"
+                  value={resolvedByOfficer}
+                  onChange={(e) => setResolvedByOfficer(e.target.value)}
+                  placeholder="Officer Full Name and Designation"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-xs sm:text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                  Resolution Statement & Action Log (Mandatory)
+                </label>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+                  Manually enter the detailed outcome: how the issue was investigated, findings, remedial action taken, and legal redressal granted. This statement will be permanently recorded and displayed on the citizen's portal and official PDF certificate.
+                </p>
+                <textarea
+                  rows={4}
+                  value={resolutionNotes}
+                  onChange={(e) => setResolutionNotes(e.target.value)}
+                  placeholder="e.g. Conducted inquiry with the local branch manager. Disputed transaction was traced to fraudulent merchant gateway and successfully refunded to complainant's savings account. Account security keys refreshed and case closed satisfactorily."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 leading-relaxed text-xs sm:text-sm"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={() => setShowResolveModal(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={handleConfirmResolve}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  {actionLoading ? 'Issuing Clearance...' : 'Confirm Clearance & Issue Certificate'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

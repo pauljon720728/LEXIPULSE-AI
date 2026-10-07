@@ -772,6 +772,43 @@ export default function CitizenPortal({ user, currentLang, onComplaintSubmitted 
                       {c.raw_text}
                     </p>
 
+                    {/* Official Clearance & Manual Resolution Box */}
+                    {isResolved && (
+                      <div className="my-3 p-3.5 rounded-2xl bg-emerald-50/95 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-1">
+                          <div className="flex items-center gap-1.5 font-extrabold text-emerald-800 dark:text-emerald-300 text-xs">
+                            <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            <span>OFFICIAL CASE CLEARED & RESOLUTION STATEMENT</span>
+                          </div>
+                          {c.resolved_at && (
+                            <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono">
+                              Cleared: {new Date(c.resolved_at).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900/60 text-slate-800 dark:text-slate-100 text-xs leading-relaxed">
+                          <span className="block font-bold text-[10px] text-emerald-700 dark:text-emerald-400 uppercase mb-0.5">
+                            Official Resolution Findings & Action Taken:
+                          </span>
+                          {c.resolution_notes || "Grievance has been thoroughly reviewed, investigated, and formally closed by the designated authority."}
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+                          <span className="text-slate-600 dark:text-slate-400 text-[11px]">
+                            Resolved By Authority: <strong className="text-slate-900 dark:text-slate-200">{c.resolved_by || "Designated Grievance Officer"}</strong>
+                          </span>
+                          <a
+                            href={downloadPdfUrl(c.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm transition-colors"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Download Official Clearance Certificate (PDF)
+                          </a>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100 dark:border-slate-700/60 text-[11px] text-slate-500">
                       <div className="flex items-center gap-3">
                         <span>Category: <strong className="text-slate-700 dark:text-slate-300">{c.category}</strong></span>

@@ -97,6 +97,7 @@ class ComplaintService {
     status = '',
     departmentId = null,
     citizenId = null,
+    citizenEmail = null,
     page = 1,
     pageSize = 25
   } = {}) {
@@ -104,25 +105,8 @@ class ComplaintService {
     try {
       let result = null;
 
-      if (isSupabaseConfigured) {
-        try {
-          result = await fetchComplaintsFromSupabase({
-            search,
-            urgency,
-            emotion,
-            category,
-            status,
-            departmentId,
-            citizenId,
-            page,
-            pageSize
-          });
-        } catch (supaErr) {
-          console.warn("Supabase fetch failed, falling back to backend API:", supaErr);
-        }
-      }
-
-      if (!result) {
+      // 1. Fetch from backend API (has complete cross-department dataset, joins, and full permission)
+      try {
         const params = new URLSearchParams({
           page: page.toString(),
           page_size: pageSize.toString()
@@ -137,12 +121,39 @@ class ComplaintService {
         if (citizenEmail) params.append('citizen_email', citizenEmail.toString());
 
         const apiRes = await apiRequest(`/complaints?${params.toString()}`);
-        result = {
-          items: apiRes.items || [],
-          total: apiRes.total || 0,
-          page,
-          pageSize
-        };
+        if (apiRes && Array.isArray(apiRes.items)) {
+          result = {
+            items: apiRes.items,
+            total: apiRes.total || apiRes.items.length,
+            page,
+            pageSize
+          };
+        }
+      } catch (backendErr) {
+        console.warn("Backend API fetch error, attempting direct Supabase query:", backendErr);
+      }
+
+      // 2. Fall back to direct Supabase query if backend API is unavailable
+      if (!result && isSupabaseConfigured) {
+        try {
+          result = await fetchComplaintsFromSupabase({
+            search,
+            urgency,
+            emotion,
+            category,
+            status,
+            departmentId,
+            citizenId,
+            page,
+            pageSize
+          });
+        } catch (supaErr) {
+          console.warn("Supabase fetch also failed:", supaErr);
+        }
+      }
+
+      if (!result) {
+        result = { items: [], total: 0, page, pageSize };
       }
 
       this.setSyncState('synced');
@@ -163,17 +174,19 @@ class ComplaintService {
   /**
    * Update complaint status:
    * Writes to Supabase first, then backend API, and lets Realtime broadcast to all clients.
-   */
-  async updateStatus(complaintId, newStatus, officerUser, notes = '') {
+  async updateStatus(complaintId, newStatus, officerUser, notes = '', resolutionNotes = '', resolvedBy = '') {
     this.setSyncState('saving');
     try {
+      const finalNotes = resolutionNotes || notes || `Status transitioned to ${newStatus}`;
+      const finalOfficerName = resolvedBy || officerUser?.full_name || 'Officer';
+
       // 1. Write to Supabase first
       if (isSupabaseConfigured) {
         await updateComplaintStatusInSupabase(
           complaintId,
           newStatus,
           officerUser,
-          notes || `Status transitioned to ${newStatus}`
+          finalNotes
         ).catch(e => console.warn("Supabase direct status write error:", e));
       }
 
@@ -181,7 +194,9 @@ class ComplaintService {
       const res = await apiRequest(`/complaints/${complaintId}/status`, 'PATCH', {
         status: newStatus,
         assigned_officer_id: officerUser?.id,
-        notes: notes || `Actioned by ${officerUser?.full_name || 'Officer'}`
+        notes: finalNotes,
+        resolution_notes: finalNotes,
+        resolved_by: finalOfficerName
       });
 
       this.setSyncState('synced');

@@ -169,7 +169,39 @@ def generate_complaint_pdf(complaint_data: dict) -> bytes:
         ]))
         story.append(t_emo)
 
-    story.append(Spacer(1, 24))
+    # Official Case Clearance & Resolution Dossier (If Resolved)
+    if complaint_data.get('status') == 'Resolved' or complaint_data.get('resolution_notes'):
+        story.append(Spacer(1, 14))
+        story.append(Paragraph("OFFICIAL CASE CLEARANCE & RESOLUTION CERTIFICATE", section_heading))
+        resolved_date_str = str(complaint_data.get('resolved_at', ''))[:19] or datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+        resolution_text = complaint_data.get('resolution_notes') or "Grievance verified, investigated, and successfully resolved by the designated officer."
+        officer_name_str = complaint_data.get('resolved_by') or "Authorized Station Head / Investigating Officer"
+
+        res_data = [
+            [
+                Paragraph("<b>Clearance Verdict:</b> <font color='#15803D'><b>OFFICIALLY RESOLVED / CASE CLEARED</b></font>", body_style),
+                Paragraph(f"<b>Resolution Timestamp:</b> {resolved_date_str}", body_style)
+            ],
+            [
+                Paragraph(f"<b>Investigating Officer:</b> {officer_name_str}", body_style),
+                Paragraph(f"<b>Designated Department:</b> {complaint_data.get('department_name', 'Jurisdiction Wing')}", body_style)
+            ],
+            [
+                Paragraph(f"<b>Official Resolution Summary & Findings:</b><br/><i>\"{resolution_text}\"</i>", body_style),
+                Paragraph("<b>Seal of Redressal:</b><br/>[Authenticated Under State Public Grievance Charter]", body_style)
+            ]
+        ]
+        t_res = Table(res_data, colWidths=[270, 270])
+        t_res.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F0FDF4')),
+            ('BOX', (0,0), (-1,-1), 1.5, colors.HexColor('#22C55E')),
+            ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#86EFAC')),
+            ('TOPPADDING', (0,0), (-1,-1), 6),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ]))
+        story.append(t_res)
+
+    story.append(Spacer(1, 20))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceAfter=14))
     
     # Official Signature Footer

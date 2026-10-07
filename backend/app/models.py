@@ -84,6 +84,8 @@ class Complaint(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     resolved_at = Column(DateTime, nullable=True)
+    resolution_notes = Column(Text, nullable=True)
+    resolved_by = Column(String(255), nullable=True)
 
     citizen = relationship("User", foreign_keys=[citizen_id], back_populates="complaints")
     assigned_officer = relationship("User", foreign_keys=[assigned_officer_id], back_populates="assigned_complaints")

@@ -107,13 +107,45 @@ class SupabaseService:
             except Exception as e:
                 logger.warning(f"Could not upsert into public.users: {e}")
 
-        return str(user_uid) if user_uid else None
+    def get_user_uuid_by_email(self, email: str) -> Optional[str]:
+        if not self.client or not email:
+            return None
+        try:
+            res = self.client.table("users").select("id").eq("email", email.strip()).limit(1).execute()
+            if res.data and len(res.data) > 0:
+                return str(res.data[0]["id"])
+            for u in self.client.auth.admin.list_users():
+                if u.email == email.strip():
+                    return str(u.id)
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def _sanitize_uuid(val: Any) -> Optional[str]:
+        if not val:
+            return None
+        s = str(val).strip()
+        try:
+            import uuid
+            uuid.UUID(s)
+            return s
+        except (ValueError, AttributeError):
+            return None
 
     def insert_complaint(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if not self.client:
             return None
         try:
-            res = self.client.table("complaints").insert(data).execute()
+            clean_data = dict(data)
+            # Ensure citizen_id is a valid UUID or looked up via citizen_email
+            raw_cid = clean_data.get("citizen_id")
+            valid_uuid = self._sanitize_uuid(raw_cid)
+            if not valid_uuid and clean_data.get("citizen_email"):
+                valid_uuid = self.get_user_uuid_by_email(clean_data["citizen_email"])
+            clean_data["citizen_id"] = valid_uuid
+
+            res = self.client.table("complaints").upsert(clean_data, on_conflict="id").execute()
             return res.data[0] if res.data else None
         except Exception as e:
             logger.error(f"Error inserting complaint to Supabase: {e}")
@@ -127,8 +159,9 @@ class SupabaseService:
                 "status": status,
                 "updated_at": datetime.datetime.utcnow().isoformat()
             }
-            if officer_id:
-                payload["assigned_officer_id"] = str(officer_id)
+            valid_off_id = self._sanitize_uuid(officer_id)
+            if valid_off_id:
+                payload["assigned_officer_id"] = valid_off_id
             if status == "Resolved":
                 payload["resolved_at"] = datetime.datetime.utcnow().isoformat()
 
@@ -149,8 +182,9 @@ class SupabaseService:
                 "user_name": user_name,
                 "timestamp": datetime.datetime.utcnow().isoformat()
             }
-            if user_id:
-                payload["user_id"] = str(user_id)
+            valid_uid = self._sanitize_uuid(user_id)
+            if valid_uid:
+                payload["user_id"] = valid_uid
             res = self.client.table("audit_log").insert(payload).execute()
             return res.data[0] if res.data else None
         except Exception as e:

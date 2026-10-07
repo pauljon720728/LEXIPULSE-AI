@@ -100,11 +100,15 @@ class ComplaintDetailOut(BaseModel):
     created_at: datetime.datetime
     updated_at: datetime.datetime
     resolved_at: Optional[datetime.datetime] = None
+    resolution_notes: Optional[str] = None
+    resolved_by: Optional[str] = None
 
 class ComplaintUpdateStatus(BaseModel):
     status: str  # Submitted, Under Review, Escalated, In Investigation, Resolved, Dismissed
     assigned_officer_id: Optional[int] = None
     notes: Optional[str] = None
+    resolution_notes: Optional[str] = None
+    resolved_by: Optional[str] = None
 
 class ComplaintFilterParams(BaseModel):
     urgency: Optional[str] = None
