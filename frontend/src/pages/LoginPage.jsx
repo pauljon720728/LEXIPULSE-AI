@@ -54,26 +54,48 @@ export default function LoginPage({ onLoginSuccess, onNavigateToRegister, curren
 
     try {
       let loggedInUser = null;
+      let backendSuccess = false;
 
       // 1. Authenticate via backend API (cross-checks SQLite and Supabase Auth with auto-sync)
-      const data = await apiRequest('/auth/login', 'POST', {
-        email: email.trim(),
-        password,
-      });
+      try {
+        const data = await apiRequest('/auth/login', 'POST', {
+          email: email.trim(),
+          password,
+        });
 
-      localStorage.setItem('legal_jwt_token', data.access_token);
-      loggedInUser = data.user;
+        if (data && data.access_token) {
+          localStorage.setItem('legal_jwt_token', data.access_token);
+          loggedInUser = data.user;
+          backendSuccess = true;
+        }
+      } catch (backendErr) {
+        console.warn("Backend API login attempt note:", backendErr.message);
+        // If it's a credentials error (401 / Incorrect password), throw directly
+        if (backendErr.message && (backendErr.message.includes('401') || backendErr.message.toLowerCase().includes('password') || backendErr.message.toLowerCase().includes('credential'))) {
+          throw backendErr;
+        }
+      }
 
       // 2. Also establish direct Supabase client session if Supabase is configured
       if (isSupabaseConfigured) {
         try {
           const supaRes = await loginUser({ email: email.trim(), password });
           if (supaRes?.user) {
-            loggedInUser = { ...loggedInUser, ...supaRes.user };
+            loggedInUser = { ...(loggedInUser || {}), ...supaRes.user };
+            if (!localStorage.getItem('legal_jwt_token') && supaRes.session?.access_token) {
+              localStorage.setItem('legal_jwt_token', supaRes.session.access_token);
+            }
           }
         } catch (supaErr) {
-          console.warn("Supabase Auth session sync note:", supaErr.message);
+          console.warn("Supabase Auth session note:", supaErr.message);
+          if (!backendSuccess) {
+            throw supaErr;
+          }
         }
+      }
+
+      if (!loggedInUser) {
+        throw new Error("Login failed. Please verify your email and password.");
       }
 
       // Store authenticated session

@@ -25,13 +25,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include Routers
-app.include_router(auth_routes.router, prefix=settings.API_V1_STR)
-app.include_router(complaint_routes.router, prefix=settings.API_V1_STR)
-app.include_router(complaint_routes.router)  # Allow direct access e.g. /complaints/submit
-app.include_router(analytics_routes.router, prefix=settings.API_V1_STR)
-app.include_router(admin_routes.router, prefix=settings.API_V1_STR)
-app.include_router(assistant_routes.router, prefix=settings.API_V1_STR)
+# Include Routers (registered both with /api and root for 100% URL flexibility)
+for r in [auth_routes.router, complaint_routes.router, analytics_routes.router, admin_routes.router, assistant_routes.router]:
+    app.include_router(r, prefix=settings.API_V1_STR)
+    app.include_router(r)
 
 @app.get("/")
 def root():
